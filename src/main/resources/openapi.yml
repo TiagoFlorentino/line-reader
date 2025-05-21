@@ -1,0 +1,62 @@
+openapi: 3.0.0
+info:
+  title: File API
+  version: 1.0.0
+  description: An API which collects lines from files
+
+paths:
+  /lines/{line_index}:
+    get:
+      summary: Get line from file
+      operationId: getLineFromFile
+      parameters:
+        - name: line_index
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successfully collect the line from the file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Line'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid line number
+        '413':
+          description: Line is beyond the end of the file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Line request is beyong the end of the file
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
+
+components:
+  schemas:
+    Line:
+      type: object
+      properties:
+        content:
+          type: string
