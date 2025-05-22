@@ -5,6 +5,7 @@ import lombok.extern.slf4j.*;
 import org.lineReader.exceptions.*;
 import org.lineReader.service.interfaces.*;
 import org.springframework.beans.factory.annotation.*;
+import org.springframework.cache.annotation.*;
 import org.springframework.stereotype.*;
 
 import java.io.*;
@@ -37,6 +38,7 @@ public class LineReaderService implements LineReaderServiceInterface {
     }
 
     @Override
+    @Cacheable(cacheNames = "linesCache", key = "#lineIndex")
     public Line getLineFromFile(Integer lineIndex) {
         Path lineReaderPath = Paths.get(this.lineReadFilePath);
         // Validate requirements before processing

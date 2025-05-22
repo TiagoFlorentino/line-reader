@@ -17,6 +17,12 @@ This service is designed to handle multiple client requests simultaneously and t
 
 ---
 
+## ❓ Defined Questions
+
+### 1 - 
+
+---
+
 ## 🔨 Troubleshooting 
 
 ### ✅ Install Java (if you don't have it)
