@@ -1,0 +1,6 @@
+Hello, world!
+This is a test file.
+Each line ends with a newline character.
+All characters are valid ASCII.
+No Unicode characters here.
+Have a great day!

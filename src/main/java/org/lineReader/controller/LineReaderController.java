@@ -3,6 +3,7 @@ package org.lineReader.controller;
 import com.lineReader.controller.*;
 import com.lineReader.model.*;
 import lombok.*;
+import org.lineReader.service.implementation.*;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,10 +11,13 @@ import org.springframework.web.bind.annotation.*;
 @AllArgsConstructor
 public class LineReaderController implements LinesApi {
 
+    private LineReaderService lineReaderService;
+
     @Override
     public ResponseEntity<Line> getLineFromFile(
             Integer lineIndex
     ) {
-        return ResponseEntity.ok(Line.builder().content("123").build());
+        Line line = this.lineReaderService.getLineFromFile(lineIndex);
+        return ResponseEntity.ok(line);
     }
 }

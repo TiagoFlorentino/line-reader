@@ -17,41 +17,11 @@ paths:
             type: integer
       responses:
         '200':
-          description: Successfully collect the line from the file
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Line'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Invalid line number
+          $ref: '#/components/responses/GetLineSuccess200'
         '413':
-          description: Line is beyond the end of the file
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Line request is beyong the end of the file
+          $ref: '#/components/responses/GetLineFailure413'
         '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Internal Server Error
+          $ref: '#/components/responses/GetLineFailure500'
 
 components:
   schemas:
@@ -60,3 +30,30 @@ components:
       properties:
         content:
           type: string
+          example: "I am the spark that ignites the flame."
+    ErrorMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "This is an example error!"
+
+  responses:
+    GetLineSuccess200:
+      description: Successfully collect the line from the file
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Line'
+    GetLineFailure413:
+      description: Line is beyond the end of the file
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorMessage'
+    GetLineFailure500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorMessage'
