@@ -5,8 +5,8 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.*;
 import org.junit.jupiter.params.*;
 import org.junit.jupiter.params.provider.*;
+import org.lineReader.exceptions.*;
 import org.lineReader.service.implementation.*;
-import org.mockito.*;
 import org.mockito.junit.jupiter.*;
 import org.springframework.test.util.*;
 
@@ -15,8 +15,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.stream.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS) // Allows the setup and destroy to be static so I can use BeforeAll and AfterAll
@@ -31,7 +30,7 @@ class LineReaderServiceTest {
         lineReaderService = new LineReaderService();
         List<String> fileComposition = List.of(
                 "Something on line 1",
-                "Something other thing on line 2"
+                "Some other thing on line 2"
         );
         // Generate a temp file
         this.testFile = Files.createTempFile("some-multi-line", ".txt");
@@ -56,10 +55,27 @@ class LineReaderServiceTest {
         assertEquals(expectedResultString, result.getContent());
     }
 
+    @Test
+    void shouldHandleIndexZero() {
+        assertThrows(GenericServiceException.class, () -> this.lineReaderService.getLineFromFile(0));
+    }
+
+    @Test
+    void shouldHandleFileDoesNotExist() {
+        ReflectionTestUtils.setField(this.lineReaderService, "lineReadFilePath", "something.txt");
+        assertThrows(GenericServiceException.class, () -> this.lineReaderService.getLineFromFile(0));
+        ReflectionTestUtils.setField(this.lineReaderService, "lineReadFilePath", testFile.toString());
+    }
+
+    @Test
+    void shouldHandleIndexTooHigh() {
+        assertThrows(OutOfBoundsIndexException.class, () -> this.lineReaderService.getLineFromFile(100));
+    }
+
     static Stream<Arguments> provideSuccessTestingParameters() {
         return Stream.of(
                 Arguments.of(1, "Something on line 1"),
-                Arguments.of(2, "Something other thing on line 2")
+                Arguments.of(2, "Some other thing on line 2")
         );
     }
 }
