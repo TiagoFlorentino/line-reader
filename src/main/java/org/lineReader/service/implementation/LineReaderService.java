@@ -9,8 +9,11 @@ import org.springframework.cache.annotation.*;
 import org.springframework.stereotype.*;
 import org.springframework.util.*;
 
+import javax.annotation.*;
 import java.io.*;
+import java.nio.charset.*;
 import java.nio.file.*;
+import java.util.concurrent.atomic.*;
 
 import static org.lineReader.messages.GenericMesssages.*;
 
@@ -18,34 +21,138 @@ import static org.lineReader.messages.GenericMesssages.*;
 @Slf4j
 public class LineReaderService implements LineReaderServiceInterface {
 
-
     @Value("${line-read-path}")
     private String lineReadFilePath;
 
-    public void validateRequirements(Integer lineIndex, Path lineReaderPath) {
-        // Validate that all the requirements are met in order to correctly return the result
+    private String txtLineReadFilePath;
+
+    private String idxLineReadFilePath;
+
+    private final AtomicBoolean finishedIndexingFile = new AtomicBoolean(false);
+
+    private final Integer logLineRangeIndex = 10_000_000;
+
+
+    private void validateRequirements(Integer lineIndex, Path lineReaderPath) {
+        // Validate generic requirements which are easy to stop
         if (lineIndex < 1) {
-            // File index needs to be positive
+            // Index should be positive and higher than 0
             log.error(ERROR_MESSAGE_INVALID_INDEX);
             throw new GenericServiceException(ERROR_MESSAGE_INVALID_INDEX);
         }
 
         if (!Files.exists(lineReaderPath)) {
-            // File needs to be present
+            // File to read exists in the project
             log.error(ERROR_MESSAGE_FILE_MISSING);
             throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
         }
     }
 
-    @Override
-    @Cacheable(cacheNames = "linesCache", key = "#lineIndex")
-    public Line getLineFromFile(Integer lineIndex) {
-        Path lineReaderPath = Paths.get(this.lineReadFilePath);
-        // Validate requirements before processing
-        this.validateRequirements(lineIndex, lineReaderPath);
-        String expectedLine = null;
+    @PostConstruct
+    private void warmUpFileProcess() {
+        // Warm up - index the required file into a separate file
+        txtLineReadFilePath = lineReadFilePath + ".txt";
+        idxLineReadFilePath = lineReadFilePath + ".idx";
 
-        try (BufferedReader lineReader = Files.newBufferedReader(lineReaderPath)) {
+        log.info(LOG_MESSAGE_START_INDEXING);
+        Path readLineFilePath = Paths.get(txtLineReadFilePath);
+        Path offSetFilePath = Paths.get(idxLineReadFilePath);
+
+        try {
+            // Delete the index the file on application start (given there might be new changes in the file)
+            Files.deleteIfExists(Paths.get(idxLineReadFilePath));
+        } catch (IOException e) {
+            log.error(LOG_MESSAGE_FAILED_TO_DELETE_INDEX_FILE);
+            return;
+        }
+
+        // Async process in order to not block the application
+        new Thread(() -> {
+
+            if (!Files.exists(readLineFilePath)) {
+                // Cannot index a missing file
+                log.error(LOG_MESSAGE_FILE_MISSING_AT_INDEX);
+                return;
+            }
+
+            long currentOffset = 0;
+            String currentLine;
+            int indexedLineCount = 0;
+
+            // Read from the line file
+            try (BufferedReader lineReader = Files.newBufferedReader(readLineFilePath, StandardCharsets.UTF_8);
+                 // Write to an index file
+                 BufferedWriter offSetWriter = Files.newBufferedWriter(offSetFilePath, StandardCharsets.UTF_8)) {
+
+                while (true) {
+                    currentLine = lineReader.readLine();
+                    if (ObjectUtils.isEmpty(currentLine)) {
+                        // EOF, we can stop indexing!
+                        break;
+                    }
+
+                    if (currentOffset != 0) {
+                        // Skip the new line on the first iteration
+                        offSetWriter.newLine();
+                    }
+
+                    // Write the offset - starts at 0 and then always write the previous offSet
+                    offSetWriter.write(Long.toString(currentOffset));
+
+                    currentOffset += currentLine.getBytes(StandardCharsets.UTF_8).length + 1; // The offset shifts the size of the line + 1 (in order to know where the line starts)
+                    indexedLineCount++; // Next line
+
+                    if (indexedLineCount % logLineRangeIndex == 0) {
+                        // Log every 10 000 000 lines
+                        log.info("Already indexed {} lines, still going ⏳", indexedLineCount);
+                    }
+                }
+
+                // Finished indexing the whole file!
+                finishedIndexingFile.set(true);
+                log.info("Completed indexing! {} lines where indexed 🎉", indexedLineCount);
+            } catch (IOException e) {
+                log.error(e.getMessage());
+                log.error("Failed to index the file!");
+            }
+        }).start();
+    }
+
+    private Line collectLineFromIndexedFile(Integer lineIndex, Path linePath, Path offSetPath) {
+        // Read from the indexed file - optimized solution
+        String offSetLine;
+        try (BufferedReader offsetReader = Files.newBufferedReader(offSetPath, StandardCharsets.UTF_8)) {
+            for (int lineCounter = 1; lineCounter < lineIndex; lineCounter++) {
+                // Iterate though the lines of the file
+                if (ObjectUtils.isEmpty(offsetReader.readLine())) {
+                    // Out of bounds - we only use this solution if the full read line file was indexed
+                    throw new OutOfBoundsIndexException(ERROR_MESSAGE_OUT_BOUNDS);
+                }
+            }
+            offSetLine = offsetReader.readLine();
+            if (ObjectUtils.isEmpty(offSetLine)) {
+                // Expected line was empty, no value can be processed
+                throw new OutOfBoundsIndexException(ERROR_MESSAGE_OUT_BOUNDS);
+            }
+
+            Long resultOffSet = Long.parseLong(offSetLine);
+
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(linePath.toFile(), "r")) {
+                // RandomAcessFile allows us to read from a file from a certain position (that we have calculated before)
+                randomAccessFile.seek(resultOffSet);
+                String lineResult = randomAccessFile.readLine();
+                return Line.builder().content(lineResult).build();
+            }
+
+        } catch (IOException e) {
+            log.error(e.getMessage());
+            throw new GenericServiceException(ERROR_MESSAGE_FAILED_READING_INDEX);
+        }
+    }
+
+    private Line collectLineFromSampleFile(Integer lineIndex, Path linePath) {
+        String expectedLine;
+        try (BufferedReader lineReader = Files.newBufferedReader(linePath)) {
 
             for (int lineCounter = 1; lineCounter < lineIndex; lineCounter++) {
                 // Iterate though the lines of the file
@@ -63,10 +170,29 @@ public class LineReaderService implements LineReaderServiceInterface {
 
         } catch (IOException e) {
             log.error(e.getMessage());
-            throw new GenericServiceException("IO Exception issues");
+            throw new GenericServiceException(ERROR_MESSAGE_FAILED_READING);
         }
 
         // Success!
         return Line.builder().content(expectedLine).build();
     }
+
+
+    @Override
+    @Cacheable(cacheNames = "linesCache", key = "#lineIndex")
+    public Line getLineFromFile(Integer lineIndex) {
+        Path readFilePath = Paths.get(txtLineReadFilePath);
+        // Check requirements
+        validateRequirements(lineIndex, readFilePath);
+
+        if (finishedIndexingFile.get()) {
+            // If the index file is complete, use the optimized solution
+            Path offSetPath = Paths.get(idxLineReadFilePath);
+            return collectLineFromIndexedFile(lineIndex, readFilePath, offSetPath);
+        } else {
+            // Default to go through the file
+            return collectLineFromSampleFile(lineIndex, readFilePath);
+        }
+    }
+
 }

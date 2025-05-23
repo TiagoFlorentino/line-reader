@@ -13,8 +13,8 @@ public class CacheConfig {
     @Bean
     public Caffeine<Object, Object> caffeineConfig() {
         return Caffeine.newBuilder()
-                .expireAfterAccess(1, TimeUnit.MINUTES)
-                .maximumSize(10_000);
+                .expireAfterAccess(10, TimeUnit.MINUTES) // Expire after 10 minutes (could be more or less depending on requirements)
+                .maximumSize(100_000); // 100 000 lines max size
     }
 
     @Bean
