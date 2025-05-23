@@ -3,56 +3,44 @@ package services;
 import com.lineReader.model.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.*;
-import org.junit.jupiter.params.*;
-import org.junit.jupiter.params.provider.*;
 import org.lineReader.exceptions.*;
 import org.lineReader.service.implementation.*;
+import org.mockito.*;
 import org.mockito.junit.jupiter.*;
-import org.springframework.test.util.*;
 
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-import java.util.stream.*;
+import java.lang.reflect.*;
+import java.util.concurrent.atomic.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS) // Allows the setup and destroy to be static so we can use BeforeAll and AfterAll
 class LineReaderServiceTest {
 
+    @InjectMocks
     private LineReaderService lineReaderService;
 
-    private Path testFile;
+    private static final String FILE_BASE_PATH = "src/test/resources/readLineTestFile";
 
-    @BeforeAll
-    void setUp() throws IOException {
-        lineReaderService = new LineReaderService();
-        List<String> fileComposition = List.of(
-                "Something on line 1",
-                "Some other thing on line 2"
-        );
-        // Generate a temp file
-        this.testFile = Files.createTempFile("some-multi-line", ".txt");
-        // Write to it
-        Files.write(this.testFile, fileComposition); // \n are added at the end of every line
-        // Mock the file name
-        ReflectionTestUtils.setField(this.lineReaderService, "lineReadFilePath", testFile.toString());
-    }
+    @BeforeEach
+    public void setup() throws NoSuchFieldException, IllegalAccessException {
+        // Set all of the service variables manually given the test don't have a application associated to them
+        Field lineReadFilePath = LineReaderService.class.getDeclaredField("lineReadFilePath");
+        lineReadFilePath.setAccessible(true);
+        lineReadFilePath.set(lineReaderService, FILE_BASE_PATH);
 
-    @AfterAll
-    void destroyAfterAll() throws IOException {
-        // Delete the file at end of execution
-        Files.deleteIfExists(this.testFile);
-    }
+        Field txtLineReadFilePath = LineReaderService.class.getDeclaredField("txtLineReadFilePath");
+        txtLineReadFilePath.setAccessible(true);
+        txtLineReadFilePath.set(lineReaderService, FILE_BASE_PATH + ".txt");
 
-    @ParameterizedTest
-    @MethodSource("provideSuccessTestingParameters")
-    void shouldGetLineFromFile(Integer lineIndex, String expectedResultString) {
-        Line result = this.lineReaderService.getLineFromFile(lineIndex);
-        // Assert Body Results
-        assertNotNull(result);
-        assertEquals(expectedResultString, result.getContent());
+        Field idxLineReadFilePath = LineReaderService.class.getDeclaredField("idxLineReadFilePath");
+        idxLineReadFilePath.setAccessible(true);
+        idxLineReadFilePath.set(lineReaderService, FILE_BASE_PATH + ".idx");
+
+        Field finishedIndexingFile = LineReaderService.class.getDeclaredField("finishedIndexingFile");
+        finishedIndexingFile.setAccessible(true);
+        AtomicBoolean atomicBoolean = new AtomicBoolean(true);
+        finishedIndexingFile.set(lineReaderService, atomicBoolean);
     }
 
     @Test
@@ -61,21 +49,45 @@ class LineReaderServiceTest {
     }
 
     @Test
-    void shouldHandleFileDoesNotExist() {
-        ReflectionTestUtils.setField(this.lineReaderService, "lineReadFilePath", "something.txt");
-        assertThrows(GenericServiceException.class, () -> this.lineReaderService.getLineFromFile(0));
-        ReflectionTestUtils.setField(this.lineReaderService, "lineReadFilePath", testFile.toString());
+    public void shouldHandleMissingLineFile() throws NoSuchFieldException, IllegalAccessException {
+        String fileName = "something_not_found";
+        Field lineReadFilePath = LineReaderService.class.getDeclaredField("lineReadFilePath");
+        lineReadFilePath.setAccessible(true);
+        lineReadFilePath.set(lineReaderService, fileName);
+
+        Field txtLineReadFilePath = LineReaderService.class.getDeclaredField("txtLineReadFilePath");
+        txtLineReadFilePath.setAccessible(true);
+        txtLineReadFilePath.set(lineReaderService, fileName + ".txt");
+
+        assertThrows(GenericServiceException.class, () -> this.lineReaderService.getLineFromFile(1));
     }
 
     @Test
-    void shouldHandleIndexTooHigh() {
-        assertThrows(OutOfBoundsIndexException.class, () -> this.lineReaderService.getLineFromFile(100));
+    public void shouldHandleMissingIndexFile() throws NoSuchFieldException, IllegalAccessException {
+        String fileName = "something_not_found";
+        Field idxLineReadFilePath = LineReaderService.class.getDeclaredField("idxLineReadFilePath");
+        idxLineReadFilePath.setAccessible(true);
+        idxLineReadFilePath.set(lineReaderService, fileName + ".idx");
+
+        assertThrows(GenericServiceException.class, () -> this.lineReaderService.getLineFromFile(1));
     }
 
-    static Stream<Arguments> provideSuccessTestingParameters() {
-        return Stream.of(
-                Arguments.of(1, "Something on line 1"),
-                Arguments.of(2, "Some other thing on line 2")
-        );
+    @Test
+    public void shouldGetLineFromIndexFile() throws Exception {
+        String expectedResult = "This is line 2";
+        Line resultLine = lineReaderService.getLineFromFile(2);
+        assertEquals(expectedResult, resultLine.getContent());
+    }
+
+    @Test
+    public void shouldGetLineFromLineFile() throws Exception {
+        Field finishedIndexingFile = LineReaderService.class.getDeclaredField("finishedIndexingFile");
+        finishedIndexingFile.setAccessible(true);
+        AtomicBoolean atomicBoolean = new AtomicBoolean(false);
+        finishedIndexingFile.set(lineReaderService, atomicBoolean);
+
+        String expectedResult = "This is line 3";
+        Line resultLine = lineReaderService.getLineFromFile(3);
+        assertEquals(expectedResult, resultLine.getContent());
     }
 }

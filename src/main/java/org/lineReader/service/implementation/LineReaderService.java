@@ -33,7 +33,7 @@ public class LineReaderService implements LineReaderServiceInterface {
     private final Integer logLineRangeIndex = 10_000_000;
 
 
-    private void validateRequirements(Integer lineIndex, Path lineReaderPath) {
+    private void validateRequirements(Integer lineIndex, Path lineReaderPath, Path indexFilePath) {
         // Validate generic requirements which are easy to stop
         if (lineIndex < 1) {
             // Index should be positive and higher than 0
@@ -46,6 +46,15 @@ public class LineReaderService implements LineReaderServiceInterface {
             log.error(ERROR_MESSAGE_FILE_MISSING);
             throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
         }
+
+        if (!ObjectUtils.isEmpty(indexFilePath)){
+            if (!Files.exists(indexFilePath)) {
+                // Index file is missing
+                log.error(ERROR_MESSAGE_INDEX_FILE_MISSING);
+                throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
+            }
+        }
+
     }
 
     @PostConstruct
@@ -138,7 +147,7 @@ public class LineReaderService implements LineReaderServiceInterface {
             Long resultOffSet = Long.parseLong(offSetLine);
 
             try (RandomAccessFile randomAccessFile = new RandomAccessFile(linePath.toFile(), "r")) {
-                // RandomAcessFile allows us to read from a file from a certain position (that we have calculated before)
+                // RandomAccessFile allows us to read from a file from a certain position (that we have calculated before)
                 randomAccessFile.seek(resultOffSet);
                 String lineResult = randomAccessFile.readLine();
                 return Line.builder().content(lineResult).build();
@@ -182,14 +191,16 @@ public class LineReaderService implements LineReaderServiceInterface {
     @Cacheable(cacheNames = "linesCache", key = "#lineIndex")
     public Line getLineFromFile(Integer lineIndex) {
         Path readFilePath = Paths.get(txtLineReadFilePath);
-        // Check requirements
-        validateRequirements(lineIndex, readFilePath);
 
         if (finishedIndexingFile.get()) {
             // If the index file is complete, use the optimized solution
             Path offSetPath = Paths.get(idxLineReadFilePath);
+            // Check requirements
+            validateRequirements(lineIndex, readFilePath, offSetPath);
             return collectLineFromIndexedFile(lineIndex, readFilePath, offSetPath);
         } else {
+            // Check requirements
+            validateRequirements(lineIndex, readFilePath, null);
             // Default to go through the file
             return collectLineFromSampleFile(lineIndex, readFilePath);
         }

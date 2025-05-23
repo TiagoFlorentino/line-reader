@@ -12,6 +12,8 @@ public class GenericMesssages {
 
     public static final String ERROR_MESSAGE_FILE_MISSING = "File does not exist!";
 
+    public static final String ERROR_MESSAGE_INDEX_FILE_MISSING = "Index file does not exist!";
+
     public static final String ERROR_MESSAGE_INVALID_INDEX = "Index is invalid!";
 
     public static final String LOG_MESSAGE_START_INDEXING = "🧵 Start async thread for indexing";
