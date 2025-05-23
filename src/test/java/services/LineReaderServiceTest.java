@@ -80,6 +80,11 @@ class LineReaderServiceTest {
     }
 
     @Test
+    public void shouldGetLineFromIndexFileOutOfBounds() throws Exception {
+        assertThrows(OutOfBoundsIndexException.class, () -> this.lineReaderService.getLineFromFile(10));
+    }
+
+    @Test
     public void shouldGetLineFromLineFile() throws Exception {
         Field finishedIndexingFile = LineReaderService.class.getDeclaredField("finishedIndexingFile");
         finishedIndexingFile.setAccessible(true);
@@ -89,5 +94,14 @@ class LineReaderServiceTest {
         String expectedResult = "This is line 3";
         Line resultLine = lineReaderService.getLineFromFile(3);
         assertEquals(expectedResult, resultLine.getContent());
+    }
+
+    @Test
+    public void shouldGetLineFromLineFileOutOfBounds() throws Exception {
+        Field finishedIndexingFile = LineReaderService.class.getDeclaredField("finishedIndexingFile");
+        finishedIndexingFile.setAccessible(true);
+        AtomicBoolean atomicBoolean = new AtomicBoolean(false);
+        finishedIndexingFile.set(lineReaderService, atomicBoolean);
+        assertThrows(OutOfBoundsIndexException.class, () -> this.lineReaderService.getLineFromFile(10));
     }
 }
