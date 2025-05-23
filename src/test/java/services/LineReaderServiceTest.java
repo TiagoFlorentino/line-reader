@@ -18,7 +18,7 @@ import java.util.stream.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS) // Allows the setup and destroy to be static so I can use BeforeAll and AfterAll
+@TestInstance(TestInstance.Lifecycle.PER_CLASS) // Allows the setup and destroy to be static so we can use BeforeAll and AfterAll
 class LineReaderServiceTest {
 
     private LineReaderService lineReaderService;

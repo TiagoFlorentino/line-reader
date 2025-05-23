@@ -7,10 +7,10 @@ import org.lineReader.service.interfaces.*;
 import org.springframework.beans.factory.annotation.*;
 import org.springframework.cache.annotation.*;
 import org.springframework.stereotype.*;
+import org.springframework.util.*;
 
 import java.io.*;
 import java.nio.file.*;
-import java.util.concurrent.atomic.*;
 
 import static org.lineReader.messages.GenericMesssages.*;
 
@@ -43,28 +43,30 @@ public class LineReaderService implements LineReaderServiceInterface {
         Path lineReaderPath = Paths.get(this.lineReadFilePath);
         // Validate requirements before processing
         this.validateRequirements(lineIndex, lineReaderPath);
+        String expectedLine = null;
 
-         AtomicInteger lineCounter = new AtomicInteger(1); // Integer final wrapper required for changes to be done within stream
         try (BufferedReader lineReader = Files.newBufferedReader(lineReaderPath)) {
 
-            return lineReader.lines()
-                    .filter(
-                            // check for the line requested
-                            line -> lineCounter.getAndIncrement() == lineIndex
-                    )
-                    .findFirst() // collect the result from the found line
-                    .map(
-                            // Build the result as an object
-                            lineValue -> Line.builder().content(lineValue).build()
-                    )
-                    .orElseThrow(
-                            // Index was invalid, throw out of bounds
-                            () -> new OutOfBoundsIndexException(ERROR_MESSAGE_OUT_BOUNDS)
-                    );
+            for (int lineCounter = 1; lineCounter < lineIndex; lineCounter++) {
+                // Iterate though the lines of the file
+                if (ObjectUtils.isEmpty(lineReader.readLine())) {
+                    // Stop execution if we find EOF - no need to continue through the loop
+                    throw new OutOfBoundsIndexException(ERROR_MESSAGE_OUT_BOUNDS);
+                }
+            }
+
+            expectedLine = lineReader.readLine();
+            if (ObjectUtils.isEmpty(expectedLine)) {
+                // The line we got to was the one after the EOF
+                throw new OutOfBoundsIndexException(ERROR_MESSAGE_OUT_BOUNDS);
+            }
 
         } catch (IOException e) {
             log.error(e.getMessage());
             throw new GenericServiceException("IO Exception issues");
         }
+
+        // Success!
+        return Line.builder().content(expectedLine).build();
     }
 }
