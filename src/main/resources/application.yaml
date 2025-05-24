@@ -1,6 +1,6 @@
 server:
   port: 8081
 
-# line-read-path:  multiline
+line-read-path:  multiline
 # line-read-path:  1GB_file
-line-read-path: 10GB_file
+# line-read-path: 10GB_file
