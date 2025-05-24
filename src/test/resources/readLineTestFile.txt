@@ -1,5 +1,3 @@
-This is line 1
-This is line 2
-This is line 3
-This is line 4
-This is line 5
+version https://git-lfs.github.com/spec/v1
+oid sha256:d3dd155b1e975f001757cdf967b693ad93dcc71fd00b6952d33797d55b5985ae
+size 74

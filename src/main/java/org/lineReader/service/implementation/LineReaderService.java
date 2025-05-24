@@ -32,31 +32,6 @@ public class LineReaderService implements LineReaderServiceInterface {
 
     private final Integer logLineRangeIndex = 10_000_000;
 
-
-    private void validateRequirements(Integer lineIndex, Path lineReaderPath, Path indexFilePath) {
-        // Validate generic requirements which are easy to stop
-        if (lineIndex < 1) {
-            // Index should be positive and higher than 0
-            log.error(ERROR_MESSAGE_INVALID_INDEX);
-            throw new GenericServiceException(ERROR_MESSAGE_INVALID_INDEX);
-        }
-
-        if (!Files.exists(lineReaderPath)) {
-            // File to read exists in the project
-            log.error(ERROR_MESSAGE_FILE_MISSING);
-            throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
-        }
-
-        if (!ObjectUtils.isEmpty(indexFilePath)){
-            if (!Files.exists(indexFilePath)) {
-                // Index file is missing
-                log.error(ERROR_MESSAGE_INDEX_FILE_MISSING);
-                throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
-            }
-        }
-
-    }
-
     @PostConstruct
     private void warmUpFileProcess() {
         // Warm up - index the required file into a separate file
@@ -127,6 +102,30 @@ public class LineReaderService implements LineReaderServiceInterface {
         }).start();
     }
 
+    private void validateRequirements(Integer lineIndex, Path lineReaderPath, Path indexFilePath) {
+        // Validate generic requirements which are easy to stop
+        if (lineIndex < 1) {
+            // Index should be positive and higher than 0
+            log.error(ERROR_MESSAGE_INVALID_INDEX);
+            throw new GenericServiceException(ERROR_MESSAGE_INVALID_INDEX);
+        }
+
+        if (!Files.exists(lineReaderPath)) {
+            // File to read exists in the project
+            log.error(ERROR_MESSAGE_FILE_MISSING);
+            throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
+        }
+
+        if (!ObjectUtils.isEmpty(indexFilePath)){
+            if (!Files.exists(indexFilePath)) {
+                // Index file is missing
+                log.error(ERROR_MESSAGE_INDEX_FILE_MISSING);
+                throw new GenericServiceException(ERROR_MESSAGE_FILE_MISSING);
+            }
+        }
+
+    }
+
     private Line collectLineFromIndexedFile(Integer lineIndex, Path linePath, Path offSetPath) {
         // Read from the indexed file - optimized solution
         String offSetLine;
@@ -144,7 +143,7 @@ public class LineReaderService implements LineReaderServiceInterface {
                 throw new OutOfBoundsIndexException(ERROR_MESSAGE_OUT_BOUNDS);
             }
 
-            Long resultOffSet = Long.parseLong(offSetLine);
+            long resultOffSet = Long.parseLong(offSetLine);
 
             try (RandomAccessFile randomAccessFile = new RandomAccessFile(linePath.toFile(), "r")) {
                 // RandomAccessFile allows us to read from a file from a certain position (that we have calculated before)
